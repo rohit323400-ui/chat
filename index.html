@@ -63,7 +63,6 @@
       background: #dcf8c6;
       float: right;
     }
-  
   small {
   display: block !important;
   text-align: right;
@@ -76,8 +75,8 @@
   text-align: left;
 }
 
-    }
-  </style>
+  
+</style>
 </head>
 
 <body>
@@ -162,45 +161,42 @@ function afterLogin(user) {
 /* ---------- ONLINE / OFFLINE ---------- */
 function presence(email) {
   const ref = rtdb.ref("status/" + email.replace(".", "_"));
-  
   rtdb.ref(".info/connected").on("value", snap => {
-    if (snap.val()) {
-      ref.onDisconnect().update({ state: "offline", lastSeen: Date.now() });
+    if (snap.val() === true) {
+      ref.onDisconnect().set({ state: "offline", lastSeen: Date.now() });
       ref.set({ state: "online", lastSeen: Date.now() });
     }
   });
+}
 function listenStatus(myEmail) {
-  const allStatusRef = rtdb.ref("status");
-  allStatusRef.on("value", snap => {
-    let statusText = "";
+  rtdb.ref("status").on("value", snap => {
+    let onlineCount = 0;
     snap.forEach(childSnap => {
-      const userStatus = childSnap.val();
-      const userEmail = childSnap.key.replace("_", ".");
-      if (userEmail !== myEmail) {
-        statusText += `${userStatus.state === "online" ? "🟢" : "⚫"} Online | `;
-      }
+      if (childSnap.val().state === "online") onlineCount++;
     });
-    status.innerText = statusText || "Waiting for others...";
+    status.innerText = onlineCount > 1 ? `🟢 ${onlineCount-1} online` : "⚫ Offline";
   });
 }
-/* ---------- SEND MESSAGE ---------- */
 
+/* ---------- SEND MESSAGE ---------- */
 function send() {
   const text = msg.value;
   if (!text) return;
-
   const me = localStorage.getItem("me");
   db.collection("messages").add({
     user: me,
-    text,
+    text: text,
     status: "sent",
     time: firebase.firestore.FieldValue.serverTimestamp()
   }).then(docRef => {
-    docRef.update({ status: "delivered" });
+    setTimeout(() => {
+      docRef.update({ status: "delivered" });
+    }, 1000);
   });
-
   msg.value = "";
 }
+
+
 
 /* ---------- MESSAGE LIST ---------- */
 db.collection("messages").orderBy("time").onSnapshot(snap => {
@@ -210,28 +206,22 @@ db.collection("messages").orderBy("time").onSnapshot(snap => {
   snap.forEach(doc => {
     const d = doc.data();
     const mine = d.user === me;
-
+    
     let tick = "📤";
-    if (d.status === "delivered") tick = "✔️✔️";
+    if (d.status === "delivered") tick = "✔️✔️"; 
     if (d.status === "seen") tick = "🔵✔️✔️";
 
-    if (!mine && d.status === "sent") {
-      doc.ref.update({ status: "delivered" });
-    }
- chat.innerHTML += `
+    chat.innerHTML += `
       <li class="msg ${mine ? "right" : "left"}">
         ${d.text}
-        <small>${tick} ${d.time ? new Date(d.time.toDate()).toLocaleTimeString() : ''}</small>
+        <small>${tick}</small>
       </li>`;
   });
 
-  // Mark visible messages as seen
-  snap.forEach(doc => {
-    const d = doc.data();
-    if (d.user !== me && d.status === "delivered") {
-      doc.ref.update({ status: "seen" });
-    }
-  });
+  const lastMsg = snap.docs[snap.docs.length - 1];
+  if (lastMsg && lastMsg.data().user !== me && lastMsg.data().status === "delivered") {
+    lastMsg.ref.update({ status: "seen" });
+  }
 });
 
 /* ---------- LOGOUT ---------- */
