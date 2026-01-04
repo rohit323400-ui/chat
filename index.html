@@ -63,9 +63,9 @@
       background: #dcf8c6;
       float: right;
     }
-    
+
     small {
-      display: block !important;
+      display: block;
       text-align: right;
       font-size: 11px;
       color: #667781;
@@ -79,16 +79,12 @@
 </head>
 
 <body>
-
 <!-- LOGIN -->
 <div id="loginBox">
-  <h3>Login</h3>
-
+  <h3>WhatsApp Clone</h3>
   <input id="email" placeholder="Email">
   <input id="password" type="password" placeholder="Password">
-
-  <button onclick="emailLogin()">Email Login / Signup</button>
-  <button onclick="googleLogin()">Google Login</button>
+  <button onclick="emailLogin()">Login / Signup</button>
 </div>
 
 <!-- CHAT -->
@@ -96,14 +92,12 @@
   <button onclick="logout()">Logout</button>
   <h3>Chat</h3>
   <p id="status">Loading...</p>
-
   <ul id="chat"></ul>
-
-  <input id="msg" placeholder="Message">
+  <input id="msg" placeholder="Type message...">
   <button onclick="send()">Send</button>
 </div>
 
-<!-- Firebase -->
+<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
@@ -119,117 +113,150 @@ const firebaseConfig = {
   appId: "1:823915766458:web:db499423d5f7914af69883"
 };
 
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
-
 const auth = firebase.auth();
 const db = firebase.firestore();
 const rtdb = firebase.database();
 
-/* ---------- LOGIN ---------- */
+// EMAIL LOGIN
 function emailLogin() {
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
+  const emailInput = document.getElementById('email');
+  const passwordInput = document.getElementById('password');
+  const email = emailInput.value.trim();
+  const password = passwordInput.value.trim();
 
+  if (!email || !password) {
+    alert('Please enter email and password');
+    return;
+  }
+
+  // Try login first, then signup
   auth.signInWithEmailAndPassword(email, password)
-    .then(r => afterLogin(r.user))
-    .catch(e => {
+    .then(user => afterLogin(user))
+    .catch(err => {
+      // If login fails, try signup
       auth.createUserWithEmailAndPassword(email, password)
-        .then(r => afterLogin(r.user))
-        .catch(err => alert("Error: " + err.message));
+        .then(user => afterLogin(user))
+        .catch(error => {
+          alert('Login failed: ' + error.message);
+          console.error('Auth error:', error);
+        });
     });
 }
 
-function googleLogin() {
-  const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider)
-    .then(r => afterLogin(r.user))
-    .catch(e => alert("Google login failed: " + e.message));
-}
-
-/* ---------- AFTER LOGIN ---------- */
+// AFTER LOGIN SUCCESS
 function afterLogin(user) {
-  localStorage.setItem("me", user.email);
-  document.getElementById("loginBox").style.display = "none";
-  document.getElementById("chatBox").style.display = "flex";
-  presence(user.email);
-  listenStatus(user.email);
+  localStorage.setItem('me', user.user.email);
+  document.getElementById('loginBox').style.display = 'none';
+  document.getElementById('chatBox').style.display = 'flex';
+  document.getElementById('status').textContent = 'Connected...';
+  
+  presence(user.user.email);
+  listenStatus(user.user.email);
 }
 
-/* ---------- ONLINE / OFFLINE ---------- */
+// ONLINE/OFFLINE STATUS
 function presence(email) {
-  const ref = rtdb.ref("status/" + email.replace(".", "_"));
-  rtdb.ref(".info/connected").on("value", snap => {
+  const userRef = rtdb.ref('status/' + email.replace('.', '_'));
+  
+  rtdb.ref('.info/connected').on('value', (snap) => {
     if (snap.val() === true) {
-      ref.onDisconnect().set({ state: "offline", lastSeen: Date.now() });
-      ref.set({ state: "online", lastSeen: Date.now() });
+      userRef.onDisconnect().set({
+        state: 'offline',
+        lastSeen: Date.now()
+      });
+      userRef.set({
+        state: 'online',
+        lastSeen: Date.now()
+      });
     }
   });
 }
 
 function listenStatus(myEmail) {
-  rtdb.ref("status").on("value", snap => {
+  rtdb.ref('status').on('value', (snap) => {
     let onlineCount = 0;
-    snap.forEach(childSnap => {
-      if (childSnap.val() && childSnap.val().state === "online") onlineCount++;
+    snap.forEach((childSnap) => {
+      const status = childSnap.val();
+      if (status && status.state === 'online') onlineCount++;
     });
-    status.innerText = onlineCount > 1 ? `🟢 ${onlineCount-1} online` : "⚫ Offline";
+    const statusEl = document.getElementById('status');
+    if (onlineCount > 1) {
+      statusEl.textContent = `🟢 ${onlineCount - 1} online`;
+    } else {
+      statusEl.textContent = '⚫ Offline';
+    }
   });
 }
 
-/* ---------- SEND MESSAGE ---------- */
+// SEND MESSAGE
 function send() {
-  const text = document.getElementById("msg").value;
+  const msgInput = document.getElementById('msg');
+  const text = msgInput.value.trim();
   if (!text) return;
-  const me = localStorage.getItem("me");
-  
-  db.collection("messages").add({
+
+  const me = localStorage.getItem('me');
+  db.collection('messages').add({
     user: me,
     text: text,
-    status: "sent",
+    status: 'sent',
     time: firebase.firestore.FieldValue.serverTimestamp()
-  }).then(docRef => {
+  }).then((docRef) => {
+    // Auto mark as delivered after 1 second
     setTimeout(() => {
-      docRef.update({ status: "delivered" });
+      docRef.update({ status: 'delivered' });
     }, 1000);
   });
-  document.getElementById("msg").value = "";
+  
+  msgInput.value = '';
 }
 
-/* ---------- MESSAGE LIST ---------- */
-db.collection("messages").orderBy("time").onSnapshot(snap => {
-  const chat = document.getElementById("chat");
-  chat.innerHTML = "";
-  const me = localStorage.getItem("me");
+// MESSAGE LISTENER (Real-time)
+db.collection('messages')
+  .orderBy('time')
+  .onSnapshot((snap) => {
+    const chatEl = document.getElementById('chat');
+    chatEl.innerHTML = '';
+    const me = localStorage.getItem('me');
 
-  snap.forEach(doc => {
-    const d = doc.data();
-    const mine = d.user === me;
-    
-    let tick = "📤";
-    if (d.status === "delivered") tick = "✔️✔️"; 
-    if (d.status === "seen") tick = "🔵✔️✔️";
+    snap.forEach((doc) => {
+      const data = doc.data();
+      const isMine = data.user === me;
+      
+      let tick = '📤'; // Single tick
+      if (data.status === 'delivered') tick = '✔️✔️'; // Double tick
+      if (data.status === 'seen') tick = '🔵✔️✔️'; // Blue tick
 
-    chat.innerHTML += `
-      <li class="msg ${mine ? "right" : "left"}">
-        ${d.text}
-        <small>${tick}</small>
-      </li>`;
+      chatEl.innerHTML += `
+        <li class="msg ${isMine ? 'right' : 'left'}">
+          ${data.text}
+          <small>${tick}</small>
+        </li>
+      `;
+    });
+
+    // Mark latest message as seen (if not mine)
+    const lastMsg = snap.docs[snap.docs.length - 1];
+    if (lastMsg && lastMsg.data().user !== me && lastMsg.data().status === 'delivered') {
+      lastMsg.ref.update({ status: 'seen' });
+    }
   });
 
-  // Mark last message as seen
-  const lastMsg = snap.docs[snap.docs.length - 1];
-  if (lastMsg && lastMsg.data().user !== me && lastMsg.data().status === "delivered") {
-    lastMsg.ref.update({ status: "seen" });
+// LOGOUT
+function logout() {
+  auth.signOut().then(() => {
+    localStorage.clear();
+    location.reload();
+  });
+}
+
+// Auto-login check
+auth.onAuthStateChanged((user) => {
+  if (user && !document.getElementById('chatBox').style.display === 'flex') {
+    afterLogin({ user });
   }
 });
-
-/* ---------- LOGOUT ---------- */
-function logout() {
-  auth.signOut();
-  localStorage.clear();
-  location.reload();
-}
 </script>
-
 </body>
 </html>
