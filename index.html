@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Firebase OTP Chat</title>
+  <title>Firebase Chat App</title>
   <style>
     body {
       font-family: Arial;
@@ -53,23 +53,21 @@
     }
   </style>
 </head>
-
 <body>
 
 <!-- LOGIN -->
 <div id="loginBox">
-  <h3>Mobile Number Login</h3>
+  <h3>Login</h3>
 
-  <input id="phone" placeholder="+91XXXXXXXXXX">
-  <button onclick="sendOTP()">Send OTP</button>
+  <input id="email" placeholder="Email"><br><br>
+  <input id="password" type="password" placeholder="Password"><br><br>
 
+  <button onclick="emailLogin()">Login / Signup</button>
   <br><br>
 
-  <input id="otp" placeholder="Enter OTP">
-  <button onclick="verifyOTP()">Verify OTP</button>
-
-  <div id="recaptcha-container"></div>
+  <button onclick="googleLogin()">Login with Google</button>
 </div>
+
 
 <!-- CHAT -->
 <div id="chatBox" style="display:none;">
@@ -88,80 +86,96 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 
 <script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyBNQUWYVUW3SWrCqYA1bkAiHw4B78S4VNo",
-    authDomain: "simple-chat-850dd.firebaseapp.com",
-    projectId: "simple-chat-850dd",
-    storageBucket: "simple-chat-850dd.firebasestorage.app",
-    messagingSenderId: "823915766458",
-    appId: "1:823915766458:web:db499423d5f7914af69883"
-  };
+const firebaseConfig = {
+  apiKey: "AIzaSyBNQUWYVUW3SWrCqYA1bkAiHw4B78S4VNo",
+  authDomain: "simple-chat-850dd.firebaseapp.com",
+  projectId: "simple-chat-850dd",
+  storageBucket: "simple-chat-850dd.firebasestorage.app",
+  messagingSenderId: "823915766458",
+  appId: "1:823915766458:web:db499423d5f7914af69883"
+};
 
-  firebase.initializeApp(firebaseConfig);
+firebase.initializeApp(firebaseConfig);
 
-  const db = firebase.firestore();
-  const auth = firebase.auth();
+const db = firebase.firestore();
+const auth = firebase.auth();
 
-  window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier(
-    'recaptcha-container',
-    { size: 'invisible' }
-  );
+/* ---------- EMAIL LOGIN ---------- */
+function emailLogin() {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
 
-  function sendOTP() {
-    const phone = document.getElementById("phone").value;
-    if (!phone) return alert("Phone number likho");
-
-    auth.signInWithPhoneNumber(phone, window.recaptchaVerifier)
-      .then(result => {
-        window.confirmationResult = result;
-        alert("OTP sent");
-      })
-      .catch(err => alert(err.message));
+  if (!email || !password) {
+    alert("Email aur password likho");
+    return;
   }
 
-  function verifyOTP() {
-    const code = document.getElementById("otp").value;
-    if (!code) return alert("OTP likho");
-
-    confirmationResult.confirm(code).then(result => {
-      const phone = result.user.phoneNumber;
-      localStorage.setItem("chatUser", phone);
-
-      document.getElementById("loginBox").style.display = "none";
-      document.getElementById("chatBox").style.display = "flex";
-    }).catch(() => alert("Wrong OTP"));
-  }
-
-  function send() {
-    const user = localStorage.getItem("chatUser");
-    const msg = document.getElementById("msg").value;
-    if (!msg) return;
-
-    db.collection("messages").add({
-      user,
-      text: msg,
-      time: firebase.firestore.FieldValue.serverTimestamp()
+  auth.signInWithEmailAndPassword(email, password)
+    .then(res => afterLogin(res.user))
+    .catch(err => {
+      if (err.code === "auth/user-not-found") {
+        auth.createUserWithEmailAndPassword(email, password)
+          .then(res => afterLogin(res.user))
+          .catch(e => alert(e.message));
+      } else {
+        alert(err.message);
+      }
     });
+}
 
-    document.getElementById("msg").value = "";
-  }
+/* ---------- GOOGLE LOGIN ---------- */
+function googleLogin() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider)
+    .then(res => afterLogin(res.user))
+    .catch(err => alert(err.message));
+}
 
-  db.collection("messages").orderBy("time").onSnapshot(snap => {
-    const ul = document.getElementById("chat");
-    ul.innerHTML = "";
+/* ---------- AFTER LOGIN ---------- */
+function afterLogin(user) {
+  const name = user.email;
 
-    snap.forEach(doc => {
-      const d = doc.data();
-      const side = d.user === localStorage.getItem("chatUser") ? "right" : "left";
-      ul.innerHTML += `<li class="msg ${side}">${d.text}</li>`;
-    });
+  localStorage.setItem("chatName", name);
+
+  document.getElementById("loginBox").style.display = "none";
+  document.getElementById("chatBox").style.display = "flex";
+}
+
+/* ---------- SEND MESSAGE ---------- */
+function send() {
+  const user = localStorage.getItem("chatName");
+  const msg = document.getElementById("msg").value;
+  if (!msg) return;
+
+  db.collection("messages").add({
+    user,
+    text: msg,
+    time: firebase.firestore.FieldValue.serverTimestamp()
   });
 
-  function logout() {
-    localStorage.removeItem("chatUser");
-    location.reload();
-  }
-</script>
+  document.getElementById("msg").value = "";
+}
 
+/* ---------- MESSAGE LISTENER ---------- */
+db.collection("messages").orderBy("time").onSnapshot(snap => {
+  const ul = document.getElementById("chat");
+  ul.innerHTML = "";
+
+  snap.forEach(doc => {
+    const d = doc.data();
+    const side = d.user === localStorage.getItem("chatName") ? "right" : "left";
+    ul.innerHTML += `<li class="msg ${side}">${d.text}</li>`;
+  });
+});
+
+/* ---------- LOGOUT ---------- */
+function logout() {
+  auth.signOut();
+  localStorage.removeItem("chatName");
+  location.reload();
+}
+</script>
+</head>
 </body>
-</html>
+
+
