@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test Chat</title>
+  <style>
+body {
+  font-family: Arial;
+  background:#ece5dd;
+  margin: 0;
+}
+
+/* Chat Container */
+#chatBox {
+  max-width: 420px;
+  height: 100vh;
+  margin: auto;
+  background: #e5ddd5;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Messages area */
+#chat {
+  list-style: none;
+  padding: 10px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+/* Message bubble */
+.msg {
+  max-width: 70%;
+  padding: 8px;
+  margin: 6px;
+  border-radius: 10px;
+  clear: both;
+}
+
+.left {
+  background: white;
+  float: left;
+}
+
+.right {
+  background: #dcf8c6;
+  float: right;
+}
+
+/* Input */
+#msg {
+  width: 70%;
+  padding: 10px;
+  border-radius: 20px;
+  border: none;
+  outline: none;
+}
+
+button {
+  padding: 10px;
+  border-radius: 20px;
+  border: none;
+  background: #075e54;
+  color: white;
+}
+</style>
+
+  
+</head>
+
+<body>
+
+<!-- LOGIN BOX -->
+<div id="loginBox">
+  <h3>Apna Naam Likho</h3>
+  <input id="loginName" placeholder="Enter your name">
+  <button onclick="saveName()">Start Chat</button>
+</div>
+
+<!-- CHAT BOX -->
+<div id="chatBox" style="display:none;">
+  <button onclick="logout()">Logout</button>
+  <h2>Chat</h2>
+
+  <div id="status">🟢 Online</div>
+  <div id="lastSeen" style="font-size:12px;color:gray;"></div>
+  <div id="typing" style="font-size:13px;color:gray;"></div>
+
+  <input type="text" id="msg" placeholder="Message">
+  <button onclick="send()">Send</button>
+
+  <ul id="chat"></ul>
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyBNQUWYVUW3SWrCqYA1bkAiHw4B78S4VNo",
+  authDomain: "simple-chat-850dd.firebaseapp.com",
+  projectId: "simple-chat-850dd",
+  storageBucket: "simple-chat-850dd.firebasestorage.app",
+  messagingSenderId: "823915766458",
+  appId: "1:823915766458:web:db499423d5f7914af69883"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* ---------- USER STATUS ---------- */
+function listenUserStatus(name) {
+  db.collection("users").doc(name).onSnapshot(doc => {
+    if (!doc.exists) return;
+    const d = doc.data();
+    const status = document.getElementById("status");
+    const lastSeen = document.getElementById("lastSeen");
+
+const typingDiv = document.getElementById("typing");
+
+if (d.typing === true) {
+  typingDiv.innerHTML = "typing...";
+} else {
+  typingDiv.innerHTML = "";
+}
+
+    if (d.online) {
+      status.innerHTML = "🟢 Online";
+      lastSeen.innerHTML = "";
+    } else {
+      status.innerHTML = "⚪ Offline";
+      if (d.lastSeen) {
+        lastSeen.innerHTML =
+          "Last seen: " +
+          new Date(d.lastSeen.seconds * 1000).toLocaleString();
+      }
+    }
+  });
+}
+
+/* ---------- LOGIN ---------- */
+function saveName() {
+  const name = document.getElementById("loginName").value;
+  if (!name) return alert("Naam likho");
+
+  localStorage.setItem("chatName", name);
+  document.getElementById("loginBox").style.display="none";
+  document.getElementById("chatBox").style.display="block";
+
+  db.collection("users").doc(name).set({
+    online:true,
+    lastSeen:firebase.firestore.FieldValue.serverTimestamp(),
+    typing:false
+ });
+
+}
+
+/* ---------- SEND MESSAGE ---------- */
+function send() {
+  const name = localStorage.getItem("chatName");
+  const msg = document.getElementById("msg").value;
+  if (!msg) return;
+
+  db.collection("messages").add({
+    user:name,
+    text:msg,
+    time:firebase.firestore.FieldValue.serverTimestamp(),
+    status:"sent"
+  });
+
+  document.getElementById("msg").value="";
+
+  db.collection("users").doc(name).update({
+  typing:false
+});
+
+}
+
+/* ---------- TICKS (WhatsApp style) ---------- */
+function getTick(status, isMe) {
+  if (!isMe) return "";
+
+  if (status === "sent") {
+    return `<span style="color:gray">✓</span>`;
+  }
+
+  if (status === "seen") {
+    return `<span style="color:#34B7F1">✓✓</span>`; // WhatsApp blue
+  }
+
+  return "";
+}
+
+/* ---------- MESSAGE LISTENER ---------- */
+db.collection("messages").orderBy("time").onSnapshot(snap=>{
+  const ul=document.getElementById("chat");
+  ul.innerHTML="";
+  snap.forEach(doc=>{
+    const d=doc.data();
+    if (d.user!==localStorage.getItem("chatName") && d.status==="sent") {
+      db.collection("messages").doc(doc.id).update({status:"seen"});
+    }
+    const side=d.user===localStorage.getItem("chatName")?"right":"left";
+    const ticks=getTick(d.status, d.user===localStorage.getItem("chatName"));
+    ul.innerHTML+=`<li class="msg ${side}">${d.text}<br><small>${ticks}</small></li>`;
+  });
+});
+
+/* ---------- LOGOUT ---------- */
+function logout() {
+  const name=localStorage.getItem("chatName");
+  if (name) {
+    db.collection("users").doc(name).update({
+      online:false,
+      lastSeen:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }
+  localStorage.removeItem("chatName");
+  location.reload();
+}
+
+/* ---------- AUTO LOGIN ---------- */
+window.onload = () => {
+  const name = localStorage.getItem("chatName");
+  if (name) {
+    document.getElementById("loginBox").style.display="none";
+    document.getElementById("chatBox").style.display="block";
+
+    db.collection("users").onSnapshot(snap => {
+      snap.forEach(doc => {
+        if (doc.id !== name) {
+          listenUserStatus(doc.id);
+        }
+      });
+    });
+  }
+};
+
+document.getElementById("msg").addEventListener("input", function () {
+  const name = localStorage.getItem("chatName");
+  if (!name) return;
+
+  db.collection("users").doc(name).update({
+    typing: true
+  });
+
+  clearTimeout(window.typingTimeout);
+
+  window.typingTimeout = setTimeout(() => {
+    db.collection("users").doc(name).update({
+      typing: false
+    });
+});
+  }, 1000);
+
+
+</script>
+</body>
+</html>
