@@ -59,7 +59,7 @@
       float: left;
     }
 
-        .right {
+    .right {
       background: #dcf8c6;
       float: right;
     }
@@ -75,8 +75,6 @@
     .right small {
       text-align: left;
     }
-  
-
   </style>
 </head>
 
@@ -97,7 +95,7 @@
 <div id="chatBox">
   <button onclick="logout()">Logout</button>
   <h3>Chat</h3>
-  <p id="status"></p>
+  <p id="status">Loading...</p>
 
   <ul id="chat"></ul>
 
@@ -129,15 +127,15 @@ const rtdb = firebase.database();
 
 /* ---------- LOGIN ---------- */
 function emailLogin() {
-  const email = email.value;
-  const password = password.value;
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
 
   auth.signInWithEmailAndPassword(email, password)
     .then(r => afterLogin(r.user))
     .catch(e => {
       auth.createUserWithEmailAndPassword(email, password)
         .then(r => afterLogin(r.user))
-        .catch(err => alert(err.message));
+        .catch(err => alert("Error: " + err.message));
     });
 }
 
@@ -145,16 +143,14 @@ function googleLogin() {
   const provider = new firebase.auth.GoogleAuthProvider();
   auth.signInWithPopup(provider)
     .then(r => afterLogin(r.user))
-    .catch(e => alert(e.message));
+    .catch(e => alert("Google login failed: " + e.message));
 }
 
 /* ---------- AFTER LOGIN ---------- */
 function afterLogin(user) {
   localStorage.setItem("me", user.email);
-
   document.getElementById("loginBox").style.display = "none";
   document.getElementById("chatBox").style.display = "flex";
-
   presence(user.email);
   listenStatus(user.email);
 }
@@ -169,11 +165,12 @@ function presence(email) {
     }
   });
 }
+
 function listenStatus(myEmail) {
   rtdb.ref("status").on("value", snap => {
     let onlineCount = 0;
     snap.forEach(childSnap => {
-      if (childSnap.val().state === "online") onlineCount++;
+      if (childSnap.val() && childSnap.val().state === "online") onlineCount++;
     });
     status.innerText = onlineCount > 1 ? `🟢 ${onlineCount-1} online` : "⚫ Offline";
   });
@@ -181,9 +178,10 @@ function listenStatus(myEmail) {
 
 /* ---------- SEND MESSAGE ---------- */
 function send() {
-  const text = msg.value;
+  const text = document.getElementById("msg").value;
   if (!text) return;
   const me = localStorage.getItem("me");
+  
   db.collection("messages").add({
     user: me,
     text: text,
@@ -194,13 +192,12 @@ function send() {
       docRef.update({ status: "delivered" });
     }, 1000);
   });
-  msg.value = "";
+  document.getElementById("msg").value = "";
 }
-
-
 
 /* ---------- MESSAGE LIST ---------- */
 db.collection("messages").orderBy("time").onSnapshot(snap => {
+  const chat = document.getElementById("chat");
   chat.innerHTML = "";
   const me = localStorage.getItem("me");
 
@@ -219,10 +216,10 @@ db.collection("messages").orderBy("time").onSnapshot(snap => {
       </li>`;
   });
 
+  // Mark last message as seen
   const lastMsg = snap.docs[snap.docs.length - 1];
   if (lastMsg && lastMsg.data().user !== me && lastMsg.data().status === "delivered") {
-    lastMsg.ref.update({ status: "seen" });  ✅ SAHI!
-
+    lastMsg.ref.update({ status: "seen" });
   }
 });
 
