@@ -1,16 +1,15 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>WhatsApp Demo Chat</title>
-
+<title>Firebase Chat Demo</title>
 <style>
 body{margin:0;font-family:Arial;background:#ece5dd}
 #login,#chat{max-width:420px;margin:auto;height:100vh;background:#e5ddd5;padding:10px}
 #chat{display:none}
 input,button{padding:10px;border-radius:20px;border:none;margin:5px 0}
 button{background:#075e54;color:#fff}
-#messages{list-style:none;padding:0;overflow-y:auto;height:70vh}
-.msg{max-width:70%;margin:5px;padding:8px;border-radius:10px}
+#messages{list-style:none;padding:0;height:65vh;overflow-y:auto}
+.msg{max-width:70%;margin:6px;padding:8px;border-radius:10px}
 .me{background:#dcf8c6;margin-left:auto}
 .other{background:#fff}
 small{display:block;font-size:11px;color:#555}
@@ -23,7 +22,8 @@ small{display:block;font-size:11px;color:#555}
 <h3>Login</h3>
 <input id="email" placeholder="Email">
 <input id="pass" type="password" placeholder="Password">
-<button onclick="login()">Login / Signup</button>
+<button onclick="emailLogin()">Email Login</button>
+<button onclick="googleLogin()">Google Login</button>
 </div>
 
 <div id="chat">
@@ -52,15 +52,28 @@ const db=firebase.firestore();
 const rdb=firebase.database();
 let me="";
 
-// LOGIN
-function login(){
+// EMAIL LOGIN
+function emailLogin(){
  const e=email.value,p=pass.value;
+ if(!e||!p){alert("Fill email & password");return;}
  auth.signInWithEmailAndPassword(e,p)
  .then(u=>start(u.user))
- .catch(()=>auth.createUserWithEmailAndPassword(e,p)
- .then(u=>start(u.user)));
+ .catch(()=>{
+  auth.createUserWithEmailAndPassword(e,p)
+  .then(u=>start(u.user))
+  .catch(err=>alert(err.message));
+ });
 }
 
+// GOOGLE LOGIN
+function googleLogin(){
+ const provider=new firebase.auth.GoogleAuthProvider();
+ auth.signInWithPopup(provider)
+ .then(u=>start(u.user))
+ .catch(e=>alert(e.message));
+}
+
+// AFTER LOGIN
 function start(user){
  me=user.email;
  login.style.display="none";
@@ -69,7 +82,7 @@ function start(user){
  listenMessages();
 }
 
-// ONLINE / OFFLINE + LAST SEEN (FAKE BUT REAL LOOK)
+// ONLINE / LAST SEEN (DEMO)
 function setOnline(){
  const ref=rdb.ref("status/"+me.replace(".","_"));
  rdb.ref(".info/connected").on("value",s=>{
@@ -85,16 +98,13 @@ function setOnline(){
  });
 }
 
-// SEND MESSAGE (TICKS LOGIC)
+// SEND MESSAGE
 function send(){
- const t=msg.value;
- if(!t)return;
- msg.value="";
+ if(!msg.value)return;
  db.collection("msgs").add({
-  user:me,text:t,status:"sent",time:Date.now()
- }).then(d=>{
-  setTimeout(()=>d.update({status:"delivered"}),1000);
- });
+  user:me,text:msg.value,status:"sent",time:Date.now()
+ }).then(d=>setTimeout(()=>d.update({status:"delivered"}),1000));
+ msg.value="";
 }
 
 // LISTEN MESSAGE + BLUE TICK
