@@ -2,17 +2,86 @@
 <html>
 <head>
 <title>Firebase Chat Demo</title>
-<style>
-body{margin:0;font-family:Arial;background:#ece5dd}
-#login,#chat{max-width:420px;margin:auto;height:100vh;background:#e5ddd5;padding:10px}
+<style>body{
+  margin:0;
+  font-family:Arial;
+  background:#ece5dd;
+}
+
+#login,#chat{
+  max-width:420px;
+  margin:auto;
+  height:100vh;
+  background:#e5ddd5;
+  display:flex;
+  flex-direction:column;
+}
+
 #chat{display:none}
-input,button{padding:10px;border-radius:20px;border:none;margin:5px 0}
-button{background:#075e54;color:#fff}
-#messages{list-style:none;padding:0;height:65vh;overflow-y:auto}
-.msg{max-width:70%;margin:6px;padding:8px;border-radius:10px}
-.me{background:#dcf8c6;margin-left:auto}
-.other{background:#fff}
-small{display:block;font-size:11px;color:#555}
+
+#topBar{
+  background:#075e54;
+  color:white;
+  padding:12px;
+  display:flex;
+  justify-content:space-between;
+  font-size:15px;
+}
+
+#messages{
+  flex:1;
+  list-style:none;
+  padding:10px;
+  overflow-y:auto;
+}
+
+.msg{
+  max-width:70%;
+  padding:8px;
+  margin:6px;
+  border-radius:8px;
+  font-size:14px;
+}
+
+.me{
+  background:#dcf8c6;
+  margin-left:auto;
+}
+
+.other{
+  background:white;
+}
+
+small{
+  font-size:11px;
+  color:#555;
+  display:block;
+  text-align:right;
+}
+
+#inputBar{
+  display:flex;
+  padding:10px;
+  background:#f0f0f0;
+}
+
+#inputBar input{
+  flex:1;
+  padding:10px;
+  border-radius:20px;
+  border:none;
+  outline:none;
+}
+
+#inputBar button{
+  margin-left:8px;
+  border-radius:50%;
+  background:#075e54;
+  color:white;
+  border:none;
+  width:40px;
+}
+
 </style>
 </head>
 
@@ -27,12 +96,19 @@ small{display:block;font-size:11px;color:#555}
 </div>
 
 <div id="chat">
-<button onclick="logout()">Logout</button>
-<p id="status">Connecting...</p>
-<ul id="messages"></ul>
-<input id="msg" placeholder="Message">
-<button onclick="send()">Send</button>
+<div id="topBar">
+  <span id="chatName">WhatsApp Chat</span>
+  <span id="status">🟢 Online</span>
 </div>
+
+<ul id="messages"></ul>
+<div id="inputBar">
+  <input id="msg" placeholder="Type a message">
+  <button onclick="send()">➤</button>
+</div>
+
+
+
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
