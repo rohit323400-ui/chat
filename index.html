@@ -59,24 +59,25 @@
       float: left;
     }
 
-    .right {
+        .right {
       background: #dcf8c6;
       float: right;
     }
-  small {
-  display: block !important;
-  text-align: right;
-  font-size: 11px;
-  color: #667781;
-  margin-top: 2px;
-}
+    
+    small {
+      display: block !important;
+      text-align: right;
+      font-size: 11px;
+      color: #667781;
+      margin-top: 2px;
+    }
 
-.right small {
-  text-align: left;
-}
-
+    .right small {
+      text-align: left;
+    }
   
-</style>
+
+  </style>
 </head>
 
 <body>
@@ -220,7 +221,8 @@ db.collection("messages").orderBy("time").onSnapshot(snap => {
 
   const lastMsg = snap.docs[snap.docs.length - 1];
   if (lastMsg && lastMsg.data().user !== me && lastMsg.data().status === "delivered") {
-    lastMsg.ref.update({ status: "seen" });
+    lastMsg.ref.update({ status: "seen" });  ✅ SAHI!
+
   }
 });
 
