@@ -1,262 +1,126 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Firebase WhatsApp Style Chat</title>
+<title>WhatsApp Demo Chat</title>
 
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial;
-      background: #ece5dd;
-    }
-
-    #loginBox, #chatBox {
-      max-width: 420px;
-      margin: auto;
-      height: 100vh;
-      background: #e5ddd5;
-      display: flex;
-      flex-direction: column;
-      padding: 10px;
-    }
-
-    #chatBox { display: none; }
-
-    input {
-      padding: 10px;
-      margin: 5px 0;
-      border-radius: 20px;
-      border: none;
-      outline: none;
-    }
-
-    button {
-      padding: 10px;
-      border-radius: 20px;
-      border: none;
-      background: #075e54;
-      color: white;
-      margin-top: 5px;
-    }
-
-    #chat {
-      flex: 1;
-      overflow-y: auto;
-      list-style: none;
-      padding: 0;
-    }
-
-    .msg {
-      max-width: 70%;
-      padding: 8px;
-      margin: 6px;
-      border-radius: 10px;
-      clear: both;
-    }
-
-    .left {
-      background: white;
-      float: left;
-    }
-
-    .right {
-      background: #dcf8c6;
-      float: right;
-    }
-
-    small {
-      display: block;
-      text-align: right;
-      font-size: 11px;
-      color: #667781;
-      margin-top: 2px;
-    }
-
-    .right small {
-      text-align: left;
-    }
-  </style>
+<style>
+body{margin:0;font-family:Arial;background:#ece5dd}
+#login,#chat{max-width:420px;margin:auto;height:100vh;background:#e5ddd5;padding:10px}
+#chat{display:none}
+input,button{padding:10px;border-radius:20px;border:none;margin:5px 0}
+button{background:#075e54;color:#fff}
+#messages{list-style:none;padding:0;overflow-y:auto;height:70vh}
+.msg{max-width:70%;margin:5px;padding:8px;border-radius:10px}
+.me{background:#dcf8c6;margin-left:auto}
+.other{background:#fff}
+small{display:block;font-size:11px;color:#555}
+</style>
 </head>
 
 <body>
-<!-- LOGIN -->
-<div id="loginBox">
-  <h3>WhatsApp Clone</h3>
-  <input id="email" placeholder="Email">
-  <input id="password" type="password" placeholder="Password">
-  <button onclick="emailLogin()">Login / Signup</button>
+
+<div id="login">
+<h3>Login</h3>
+<input id="email" placeholder="Email">
+<input id="pass" type="password" placeholder="Password">
+<button onclick="login()">Login / Signup</button>
 </div>
 
-<!-- CHAT -->
-<div id="chatBox">
-  <button onclick="logout()">Logout</button>
-  <h3>Chat</h3>
-  <p id="status">Loading...</p>
-  <ul id="chat"></ul>
-  <input id="msg" placeholder="Type message...">
-  <button onclick="send()">Send</button>
+<div id="chat">
+<button onclick="logout()">Logout</button>
+<p id="status">Connecting...</p>
+<ul id="messages"></ul>
+<input id="msg" placeholder="Message">
+<button onclick="send()">Send</button>
 </div>
 
-<!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
-const firebaseConfig = {
-  apiKey: "AIzaSyBNQUWYVUW3SWrCqYA1bkAiHw4B78S4VNo",
-  authDomain: "simple-chat-850dd.firebaseapp.com",
-  projectId: "simple-chat-850dd",
-  storageBucket: "simple-chat-850dd.firebasestorage.app",
-  messagingSenderId: "823915766458",
-  appId: "1:823915766458:web:db499423d5f7914af69883"
-};
+firebase.initializeApp({
+ apiKey:"AIzaSyBNQUWYVUW3SWrCqYA1bkAiHw4B78S4VNo",
+ authDomain:"simple-chat-850dd.firebaseapp.com",
+ projectId:"simple-chat-850dd",
+ appId:"1:823915766458:web:db499423d5f7914af69883"
+});
 
-// Initialize Firebase
-firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
-const db = firebase.firestore();
-const rtdb = firebase.database();
+const auth=firebase.auth();
+const db=firebase.firestore();
+const rdb=firebase.database();
+let me="";
 
-// EMAIL LOGIN
-function emailLogin() {
-  const emailInput = document.getElementById('email');
-  const passwordInput = document.getElementById('password');
-  const email = emailInput.value.trim();
-  const password = passwordInput.value.trim();
+// LOGIN
+function login(){
+ const e=email.value,p=pass.value;
+ auth.signInWithEmailAndPassword(e,p)
+ .then(u=>start(u.user))
+ .catch(()=>auth.createUserWithEmailAndPassword(e,p)
+ .then(u=>start(u.user)));
+}
 
-  if (!email || !password) {
-    alert('Please enter email and password');
-    return;
+function start(user){
+ me=user.email;
+ login.style.display="none";
+ chat.style.display="block";
+ setOnline();
+ listenMessages();
+}
+
+// ONLINE / OFFLINE + LAST SEEN (FAKE BUT REAL LOOK)
+function setOnline(){
+ const ref=rdb.ref("status/"+me.replace(".","_"));
+ rdb.ref(".info/connected").on("value",s=>{
+  if(s.val()){
+   ref.onDisconnect().set({state:"offline",last:Date.now()});
+   ref.set({state:"online",last:Date.now()});
   }
-
-  // Try login first, then signup
-  auth.signInWithEmailAndPassword(email, password)
-    .then(user => afterLogin(user))
-    .catch(err => {
-      // If login fails, try signup
-      auth.createUserWithEmailAndPassword(email, password)
-        .then(user => afterLogin(user))
-        .catch(error => {
-          alert('Login failed: ' + error.message);
-          console.error('Auth error:', error);
-        });
-    });
+ });
+ rdb.ref("status").on("value",snap=>{
+  let online=0;
+  snap.forEach(c=>{if(c.val().state=="online")online++;});
+  status.innerText=online>1?"🟢 Online":"⚫ Last seen recently";
+ });
 }
 
-// AFTER LOGIN SUCCESS
-function afterLogin(user) {
-  localStorage.setItem('me', user.user.email);
-  document.getElementById('loginBox').style.display = 'none';
-  document.getElementById('chatBox').style.display = 'flex';
-  document.getElementById('status').textContent = 'Connected...';
-  
-  presence(user.user.email);
-  listenStatus(user.user.email);
+// SEND MESSAGE (TICKS LOGIC)
+function send(){
+ const t=msg.value;
+ if(!t)return;
+ msg.value="";
+ db.collection("msgs").add({
+  user:me,text:t,status:"sent",time:Date.now()
+ }).then(d=>{
+  setTimeout(()=>d.update({status:"delivered"}),1000);
+ });
 }
 
-// ONLINE/OFFLINE STATUS
-function presence(email) {
-  const userRef = rtdb.ref('status/' + email.replace('.', '_'));
-  
-  rtdb.ref('.info/connected').on('value', (snap) => {
-    if (snap.val() === true) {
-      userRef.onDisconnect().set({
-        state: 'offline',
-        lastSeen: Date.now()
-      });
-      userRef.set({
-        state: 'online',
-        lastSeen: Date.now()
-      });
-    }
+// LISTEN MESSAGE + BLUE TICK
+function listenMessages(){
+ db.collection("msgs").orderBy("time").onSnapshot(s=>{
+  messages.innerHTML="";
+  s.forEach(d=>{
+   const m=d.data();
+   let tick="✔️";
+   if(m.status=="delivered")tick="✔️✔️";
+   if(m.status=="seen")tick="🔵✔️✔️";
+   messages.innerHTML+=`
+   <li class="msg ${m.user==me?"me":"other"}">
+   ${m.text}<small>${tick}</small></li>`;
   });
+  const last=s.docs[s.docs.length-1];
+  if(last && last.data().user!=me)
+   last.ref.update({status:"seen"});
+ });
 }
-
-function listenStatus(myEmail) {
-  rtdb.ref('status').on('value', (snap) => {
-    let onlineCount = 0;
-    snap.forEach((childSnap) => {
-      const status = childSnap.val();
-      if (status && status.state === 'online') onlineCount++;
-    });
-    const statusEl = document.getElementById('status');
-    if (onlineCount > 1) {
-      statusEl.textContent = `🟢 ${onlineCount - 1} online`;
-    } else {
-      statusEl.textContent = '⚫ Offline';
-    }
-  });
-}
-
-// SEND MESSAGE
-function send() {
-  const msgInput = document.getElementById('msg');
-  const text = msgInput.value.trim();
-  if (!text) return;
-
-  const me = localStorage.getItem('me');
-  db.collection('messages').add({
-    user: me,
-    text: text,
-    status: 'sent',
-    time: firebase.firestore.FieldValue.serverTimestamp()
-  }).then((docRef) => {
-    // Auto mark as delivered after 1 second
-    setTimeout(() => {
-      docRef.update({ status: 'delivered' });
-    }, 1000);
-  });
-  
-  msgInput.value = '';
-}
-
-// MESSAGE LISTENER (Real-time)
-db.collection('messages')
-  .orderBy('time')
-  .onSnapshot((snap) => {
-    const chatEl = document.getElementById('chat');
-    chatEl.innerHTML = '';
-    const me = localStorage.getItem('me');
-
-    snap.forEach((doc) => {
-      const data = doc.data();
-      const isMine = data.user === me;
-      
-      let tick = '📤'; // Single tick
-      if (data.status === 'delivered') tick = '✔️✔️'; // Double tick
-      if (data.status === 'seen') tick = '🔵✔️✔️'; // Blue tick
-
-      chatEl.innerHTML += `
-        <li class="msg ${isMine ? 'right' : 'left'}">
-          ${data.text}
-          <small>${tick}</small>
-        </li>
-      `;
-    });
-
-    // Mark latest message as seen (if not mine)
-    const lastMsg = snap.docs[snap.docs.length - 1];
-    if (lastMsg && lastMsg.data().user !== me && lastMsg.data().status === 'delivered') {
-      lastMsg.ref.update({ status: 'seen' });
-    }
-  });
 
 // LOGOUT
-function logout() {
-  auth.signOut().then(() => {
-    localStorage.clear();
-    location.reload();
-  });
+function logout(){
+ auth.signOut();
+ location.reload();
 }
-
-// Auto-login check
-auth.onAuthStateChanged((user) => {
-  if (user && !document.getElementById('chatBox').style.display === 'flex') {
-    afterLogin({ user });
-  }
-});
 </script>
 </body>
 </html>
