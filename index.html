@@ -94,7 +94,9 @@ function setOnline(){
  rdb.ref("status").on("value",snap=>{
   let online=0;
   snap.forEach(c=>{if(c.val().state=="online")online++;});
-  status.innerText=online>1?"🟢 Online":"⚫ Last seen recently";
+  status.innerText =
+ online > 1 ? "🟢 Someone is online" : "⚫ Last seen just now";
+
  });
 }
 
